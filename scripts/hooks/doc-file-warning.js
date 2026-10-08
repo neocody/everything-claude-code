@@ -13,8 +13,8 @@ process.stdin.on('end', () => {
 
     if (/\.(md|txt)$/.test(filePath) &&
         !/(README|CLAUDE|AGENTS|CONTRIBUTING|CHANGELOG|LICENSE|SKILL)\.md$/i.test(filePath) &&
-        !/\.claude[\/\\]plans[\/\\]/.test(filePath) &&
-        !/(^|[\/\\])(docs|skills|\.history)[\/\\]/.test(filePath)) {
+        !/\.claude[/\\]plans[/\\]/.test(filePath) &&
+        !/(^|[/\\])(docs|skills|\.history)[/\\]/.test(filePath)) {
       console.error('[Hook] WARNING: Non-standard documentation file detected');
       console.error('[Hook] File: ' + filePath);
       console.error('[Hook] Consider consolidating into README.md or docs/ directory');
