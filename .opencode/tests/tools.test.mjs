@@ -12,6 +12,8 @@ const project = path.join(root, 'project');
 const bin = path.join(root, 'bin');
 fs.mkdirSync(project);
 fs.mkdirSync(bin);
+const outside = path.join(root, 'outside.js');
+fs.writeFileSync(outside, '');
 const originalPath = process.env.PATH;
 const fixture = `#!${process.execPath}
 const args=process.argv.slice(2);
@@ -81,8 +83,6 @@ test('format handles language detection and explicit formatters', async () => {
 test('format reports command failures and rejects paths outside the project', async () => {
   const target = file('fail-marker.js');
   assert.equal(JSON.parse(await format.execute({ filePath: target }, context())).formatted, false);
-  const outside = path.join(root, 'outside.js');
-  fs.writeFileSync(outside, '');
   await assert.rejects(format.execute({ filePath: outside }, context()), /outside/);
   fs.symlinkSync(outside, path.join(project, 'link.js'));
   await assert.rejects(format.execute({ filePath: 'link.js' }, context()), /outside/);
@@ -92,7 +92,7 @@ test('a target replaced with an outside symlink during permission approval is re
   const result = JSON.parse(await format.execute({ filePath: target }, context(async request => {
     if (request.permission === 'bash') {
       fs.unlinkSync(path.join(project, target));
-      fs.symlinkSync(path.join(root, 'outside.js'), path.join(project, target));
+      fs.symlinkSync(outside, path.join(project, target));
     }
   })));
   assert.equal(result.formatted, false);
@@ -119,6 +119,17 @@ test('lint denies mutation, handles process failure and fences paths', async () 
   await assert.rejects(lint.execute({ fix: true }, context(async () => { throw new Error('denied'); })), /denied/);
   assert.equal(JSON.parse(await lint.execute({ target: 'fail-marker.js' }, context())).success, false);
   await assert.rejects(lint.execute({ target: '..' }, context()), /outside/);
+});
+test('lint falls back when Python configuration cannot be read', async () => {
+  const config = path.join(project, 'pyproject.toml');
+  fs.mkdirSync(config);
+  try {
+    const result = JSON.parse(await lint.execute({}, context()));
+    assert.equal(result.linter, 'eslint');
+    assert.equal(result.success, true);
+  } finally {
+    fs.rmdirSync(config);
+  }
 });
 test('git summary requests command permission and rejects option injection', async () => {
   const requests = [];

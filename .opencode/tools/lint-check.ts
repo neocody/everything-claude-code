@@ -14,10 +14,14 @@ export default tool({
     const resolved = projectPath(context, target)
     const cwd = projectDirectory(context)
     const has = (names: string[]) => names.some(name => existsSync(path.join(cwd, name)))
+    const usesRuff = () => {
+      try { return readFileSync(path.join(cwd, "pyproject.toml"), "utf8").includes("ruff") }
+      catch { return false }
+    }
     const detected = linter || (
       has(["biome.json", "biome.jsonc"]) ? "biome" :
       has([".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs", "eslint.config.js", "eslint.config.mjs"]) ? "eslint" :
-      has(["pyproject.toml"]) && readFileSync(path.join(cwd, "pyproject.toml"), "utf8").includes("ruff") ? "ruff" :
+      usesRuff() ? "ruff" :
       has([".golangci.yml", ".golangci.yaml"]) ? "golangci-lint" : "eslint"
     )
     const commands = {
