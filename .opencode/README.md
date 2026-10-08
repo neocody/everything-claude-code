@@ -1,5 +1,26 @@
 # OpenCode ECC Plugin
 
+## Local validation
+
+Use Node.js 22 for the package checks:
+
+```bash
+cd .opencode
+npm ci --ignore-scripts --no-audit --no-fund
+npm audit --audit-level=high
+npm test
+```
+
+The test command builds all package TypeScript and exercises the format, lint,
+and git tools with isolated command fixtures. It enforces at least 80% line,
+branch, and function coverage on those exercised tools. Repository CI also runs
+these checks on ready same-repository pull requests and main pushes.
+
+Format and lint targets stay within the project directory, including resolved
+symlinks. The tools request command permission before execution and edit
+permission before formatting or applying lint fixes. Commands use argument arrays,
+honor cancellation, and use installed formatters/linters without downloading them.
+
 > ⚠️ This README is specific to OpenCode usage.  
 > If you installed ECC via npm (e.g. `npm install opencode-ecc`), refer to the root README instead.
 

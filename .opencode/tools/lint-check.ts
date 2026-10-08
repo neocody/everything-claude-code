@@ -1,74 +1,45 @@
-/**
- * ECC Custom Tool: Lint Check
- *
- * Multi-language linter that auto-detects the project's linting tool.
- * Supports: ESLint/Biome (JS/TS), Pylint/Ruff (Python), golangci-lint (Go)
- */
-
-import { tool } from "@opencode-ai/plugin"
-import { z } from "zod"
+import { tool } from "@opencode-ai/plugin/tool"
+import { existsSync, readFileSync } from "node:fs"
+import * as path from "node:path"
+import { authorize, projectDirectory, projectPath, run } from "../lib/command.js"
 
 export default tool({
-  name: "lint-check",
-  description: "Run linter on files or directories. Auto-detects ESLint, Biome, Ruff, Pylint, or golangci-lint.",
-  parameters: z.object({
-    target: z.string().optional().describe("File or directory to lint (default: current directory)"),
-    fix: z.boolean().optional().describe("Auto-fix issues if supported (default: false)"),
-    linter: z.string().optional().describe("Override linter: eslint, biome, ruff, pylint, golangci-lint (default: auto-detect)"),
-  }),
-  execute: async ({ target = ".", fix = false, linter }, { $ }) => {
-    // Auto-detect linter
-    let detected = linter
-    if (!detected) {
-      try {
-        await $`test -f biome.json || test -f biome.jsonc`
-        detected = "biome"
-      } catch {
-        try {
-          await $`test -f .eslintrc.json || test -f .eslintrc.js || test -f .eslintrc.cjs || test -f eslint.config.js || test -f eslint.config.mjs`
-          detected = "eslint"
-        } catch {
-          try {
-            await $`test -f pyproject.toml && grep -q "ruff" pyproject.toml`
-            detected = "ruff"
-          } catch {
-            try {
-              await $`test -f .golangci.yml || test -f .golangci.yaml`
-              detected = "golangci-lint"
-            } catch {
-              // Fall back based on file extensions in target
-              detected = "eslint"
-            }
-          }
-        }
-      }
+  description: "Lint project files with an installed ESLint, Biome, Ruff, Pylint, or golangci-lint. Requests edit permission for fixes; never downloads a linter.",
+  args: {
+    target: tool.schema.string().min(1).optional(),
+    fix: tool.schema.boolean().optional(),
+    linter: tool.schema.enum(["eslint", "biome", "ruff", "pylint", "golangci-lint"]).optional(),
+  },
+  async execute({ target = ".", fix = false, linter }, context) {
+    const resolved = projectPath(context, target)
+    const cwd = projectDirectory(context)
+    const has = (names: string[]) => names.some(name => existsSync(path.join(cwd, name)))
+    const usesRuff = () => {
+      try { return readFileSync(path.join(cwd, "pyproject.toml"), "utf8").includes("ruff") }
+      catch { return false }
     }
-
-    const fixFlag = fix ? " --fix" : ""
-    const commands: Record<string, string> = {
-      biome: `npx @biomejs/biome lint${fix ? " --write" : ""} ${target}`,
-      eslint: `npx eslint${fixFlag} ${target}`,
-      ruff: `ruff check${fixFlag} ${target}`,
-      pylint: `pylint ${target}`,
-      "golangci-lint": `golangci-lint run${fixFlag} ${target}`,
+    const detected = linter || (
+      has(["biome.json", "biome.jsonc"]) ? "biome" :
+      has([".eslintrc.json", ".eslintrc.js", ".eslintrc.cjs", "eslint.config.js", "eslint.config.mjs"]) ? "eslint" :
+      usesRuff() ? "ruff" :
+      has([".golangci.yml", ".golangci.yaml"]) ? "golangci-lint" : "eslint"
+    )
+    const commands = {
+      biome: ["npx", "--no-install", "@biomejs/biome", "lint", ...(fix ? ["--write"] : []), resolved],
+      eslint: ["npx", "--no-install", "eslint", ...(fix ? ["--fix"] : []), resolved],
+      ruff: ["ruff", "check", ...(fix ? ["--fix"] : []), resolved],
+      pylint: ["pylint", resolved],
+      "golangci-lint": ["golangci-lint", "run", ...(fix ? ["--fix"] : []), resolved],
     }
-
-    const cmd = commands[detected]
-    if (!cmd) {
-      return { success: false, message: `Unknown linter: ${detected}` }
-    }
-
+    const [executable, ...args] = commands[detected]
+    if (fix) await context.ask({ permission: "edit", patterns: [resolved], always: [], metadata: { filePath: resolved } })
+    await authorize(context, executable, args)
     try {
-      const result = await $`${cmd}`.text()
-      return { success: true, linter: detected, output: result, issues: 0 }
-    } catch (error: unknown) {
-      const err = error as { stdout?: string; stderr?: string }
-      return {
-        success: false,
-        linter: detected,
-        output: err.stdout || "",
-        errors: err.stderr || "",
-      }
+      projectPath(context, resolved)
+      return JSON.stringify({ success: true, linter: detected, output: await run(context, executable, args), issues: 0 })
+    } catch (error) {
+      const failure = error as { stdout?: string; stderr?: string; message?: string }
+      return JSON.stringify({ success: false, linter: detected, output: failure.stdout || "", errors: failure.stderr || failure.message || "Lint failed" })
     }
   },
 })

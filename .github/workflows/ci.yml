@@ -42,3 +42,12 @@ jobs:
         run: npm audit --audit-level=high
       - name: Validate components and run every test suite
         run: npm test
+      - name: Install locked OpenCode package dependencies without lifecycle scripts
+        working-directory: .opencode
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Audit OpenCode package dependencies
+        working-directory: .opencode
+        run: npm audit --audit-level=high
+      - name: Build OpenCode tools and exercise their permission and execution contracts
+        working-directory: .opencode
+        run: npm test
