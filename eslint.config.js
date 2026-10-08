@@ -24,5 +24,9 @@ module.exports = [
             'no-undef': 'error',
             'eqeqeq': 'warn'
         }
+    },
+    {
+        files: ['.opencode/tests/**/*.mjs'],
+        languageOptions: { sourceType: 'module' }
     }
 ];

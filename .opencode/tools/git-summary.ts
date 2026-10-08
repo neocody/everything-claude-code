@@ -1,56 +1,33 @@
-/**
- * ECC Custom Tool: Git Summary
- *
- * Provides a comprehensive git status including branch info, status,
- * recent log, and diff against base branch.
- */
-
-import { tool } from "@opencode-ai/plugin"
-import { z } from "zod"
+import { tool } from "@opencode-ai/plugin/tool"
+import { authorize, run } from "../lib/command.js"
 
 export default tool({
-  name: "git-summary",
-  description: "Get comprehensive git summary: branch, status, recent log, and diff against base branch.",
-  parameters: z.object({
-    depth: z.number().optional().describe("Number of recent commits to show (default: 5)"),
-    includeDiff: z.boolean().optional().describe("Include diff against base branch (default: true)"),
-    baseBranch: z.string().optional().describe("Base branch for comparison (default: main)"),
-  }),
-  execute: async ({ depth = 5, includeDiff = true, baseBranch = "main" }, { $ }) => {
+  description: "Read git branch, status, recent log and diff statistics in the project directory.",
+  args: {
+    depth: tool.schema.number().int().min(1).max(100).optional(),
+    includeDiff: tool.schema.boolean().optional(),
+    baseBranch: tool.schema.string().min(1).optional(),
+  },
+  async execute({ depth = 5, includeDiff = true, baseBranch = "main" }, context) {
+    if (!Number.isInteger(depth) || depth < 1 || depth > 100) throw new Error("Invalid log depth")
+    if (!/^[A-Za-z0-9_][A-Za-z0-9._/-]*$/.test(baseBranch) || baseBranch.includes("..")) {
+      throw new Error("Invalid base branch")
+    }
     const results: Record<string, string> = {}
-
-    try {
-      results.branch = (await $`git branch --show-current`.text()).trim()
-    } catch {
-      results.branch = "unknown"
+    const commands: [string, string[], string][] = [
+      ["branch", ["branch", "--show-current"], "unknown"],
+      ["status", ["status", "--short"], "unable to get status"],
+      ["log", ["log", "--oneline", `-${depth}`], "unable to get log"],
+    ]
+    if (includeDiff) commands.push(
+      ["stagedDiff", ["diff", "--cached", "--stat"], ""],
+      ["branchDiff", ["diff", "--stat", `${baseBranch}...HEAD`, "--"], `unable to diff against ${baseBranch}`],
+    )
+    for (const [key, args, fallback] of commands) {
+      await authorize(context, "git", args)
+      try { results[key] = (await run(context, "git", args)).trim() }
+      catch { results[key] = fallback }
     }
-
-    try {
-      results.status = (await $`git status --short`.text()).trim()
-    } catch {
-      results.status = "unable to get status"
-    }
-
-    try {
-      results.log = (await $`git log --oneline -${depth}`.text()).trim()
-    } catch {
-      results.log = "unable to get log"
-    }
-
-    if (includeDiff) {
-      try {
-        results.stagedDiff = (await $`git diff --cached --stat`.text()).trim()
-      } catch {
-        results.stagedDiff = ""
-      }
-
-      try {
-        results.branchDiff = (await $`git diff ${baseBranch}...HEAD --stat`.text()).trim()
-      } catch {
-        results.branchDiff = `unable to diff against ${baseBranch}`
-      }
-    }
-
-    return results
+    return JSON.stringify(results)
   },
 })
