@@ -28,6 +28,7 @@ export default tool({
     await context.ask({ permission: "edit", patterns: [target], always: [], metadata: { filePath: target } })
     await authorize(context, executable, args)
     try {
+      projectPath(context, target)
       return JSON.stringify({ formatted: true, formatter: detected, output: await run(context, executable, args) })
     } catch (error) {
       return JSON.stringify({ formatted: false, formatter: detected, error: error instanceof Error ? error.message : "Format failed" })

@@ -29,6 +29,7 @@ export async function authorize(context: ToolContext, executable: string, args: 
 }
 
 export async function run(context: ToolContext, executable: string, args: string[]): Promise<string> {
+  context.abort.throwIfAborted()
   const result = await execute(executable, args, {
     cwd: projectDirectory(context), signal: context.abort,
     timeout: 120000, maxBuffer: 1024 * 1024, encoding: "utf8",

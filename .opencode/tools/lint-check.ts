@@ -31,6 +31,7 @@ export default tool({
     if (fix) await context.ask({ permission: "edit", patterns: [resolved], always: [], metadata: { filePath: resolved } })
     await authorize(context, executable, args)
     try {
+      projectPath(context, resolved)
       return JSON.stringify({ success: true, linter: detected, output: await run(context, executable, args), issues: 0 })
     } catch (error) {
       const failure = error as { stdout?: string; stderr?: string; message?: string }

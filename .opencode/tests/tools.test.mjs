@@ -87,6 +87,17 @@ test('format reports command failures and rejects paths outside the project', as
   fs.symlinkSync(outside, path.join(project, 'link.js'));
   await assert.rejects(format.execute({ filePath: 'link.js' }, context()), /outside/);
 });
+test('a target replaced with an outside symlink during permission approval is rejected', async () => {
+  const target = file('race.js');
+  const result = JSON.parse(await format.execute({ filePath: target }, context(async request => {
+    if (request.permission === 'bash') {
+      fs.unlinkSync(path.join(project, target));
+      fs.symlinkSync(path.join(root, 'outside.js'), path.join(project, target));
+    }
+  })));
+  assert.equal(result.formatted, false);
+  assert.match(result.error, /outside/);
+});
 test('lint honors project configuration and explicit options', async () => {
   for (const [config, content, linter] of [
     ['biome.json', '{}', 'biome'], ['eslint.config.js', '', 'eslint'],
