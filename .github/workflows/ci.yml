@@ -38,5 +38,7 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Lint all JavaScript and Markdown
         run: npm run lint
+      - name: Reject high-severity dependency vulnerabilities
+        run: npm audit --audit-level=high
       - name: Validate components and run every test suite
         run: npm test
