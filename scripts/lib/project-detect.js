@@ -190,7 +190,7 @@ function getPythonDeps(projectDir) {
       content.split('\n').forEach(line => {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#') && !trimmed.startsWith('-')) {
-          const name = trimmed.split(/[>=<!\[;]/)[0].trim().toLowerCase();
+          const name = trimmed.split(/[>=<![;]/)[0].trim().toLowerCase();
           if (name) deps.push(name);
         }
       });
@@ -206,7 +206,7 @@ function getPythonDeps(projectDir) {
       if (depMatches) {
         const block = depMatches[1];
         block.match(/"([^"]+)"/g)?.forEach(m => {
-          const name = m.replace(/"/g, '').split(/[>=<!\[;]/)[0].trim().toLowerCase();
+          const name = m.replace(/"/g, '').split(/[>=<![;]/)[0].trim().toLowerCase();
           if (name) deps.push(name);
         });
       }
