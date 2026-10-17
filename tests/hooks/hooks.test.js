@@ -3352,9 +3352,12 @@ async function runTests() {
       // The real string message should appear
       assert.ok(content.includes('Real user message'),
         'Should include the string content user message');
-      // Numeric/boolean/object content should NOT appear as text
-      assert.ok(!content.includes('42'),
-        'Numeric content should be skipped (else branch → empty string → filtered)');
+      // Numeric/boolean/object content should NOT appear as text. Only the Tasks list is
+      // checked: the Date/Started/Last Updated lines can contain 42 by chance (#631).
+      const tasks = (content.split('### Tasks\n')[1] || '').split('\n\n')[0]
+        .split('\n').filter(Boolean);
+      assert.deepStrictEqual(tasks, ['- Real user message'],
+        'Numeric/boolean/object content should be skipped (else branch → empty string → filtered)');
     } finally {
       fs.rmSync(isoHome, { recursive: true, force: true });
     }
