@@ -10,7 +10,8 @@ our own CI server (`neo-ci`, rule 5), enroll repos, or push, open, update and me
 use it: those minutes are free. This outranks older copied rules demanding approval for every
 Actions run. Secret-free private-repo PR and default-branch tests qualify; deploys,
 secrets, protected environments, write-token jobs, macOS/Windows and extra storage fall under
-the cost gate.
+the cost gate. Moving any job off Ubicloud onto our server (`neo-ci-trusted` included) is
+standing work too (Cody, 2026-11-13).
 
 **GitHub cost gate.** Anything else that runs GitHub Actions or uploads GitHub storage
 (artifacts, caches, Packages, LFS) needs Cody's approval for that repo and bounded usage,
@@ -19,10 +20,11 @@ triggering it (a push, PR or merge triggers). Existing workflows, public repos, 
 and "ship it" are not approval.
 - **Standing approval (Cody, 2026-10-02):** normal PR CI in every `neocody` and
   `inversecollective` repo: the jobs a repo already has (tests, small jobs like Slack notices
-  with their caches, the merge-triggered deploy) on Ubicloud (private) or free GitHub-hosted
-  runners (public). Fleet bound about $50/week.
+  with their caches, the merge-triggered deploy) on our own CI server (private, rule 5) or
+  free GitHub-hosted runners (public). Ubicloud is retired (Cody, 2026-11-13): no job runs
+  there.
 - **Under $1 needs no approval (Cody, 2026-10-02):** usage estimated under $1 for the whole PR
-  or task (about 800 Ubicloud standard-2 minutes), a small new workflow included, if it
+  or task, a small new workflow included, if it
   follows the spend rules.
 - **Always ask:** larger runners, overages, budget raises, anything above $1 for the PR or
   task (new or expanded workflows, GitHub-hosted private jobs, storage beyond configured
@@ -55,18 +57,24 @@ followed; each push re-runs the whole suite. Rules 1-3 apply on `neo-ci` too.
    branch, set `timeout-minutes`, never start on comments, reviews, labels or edits, and have
    no paid schedule more often than daily (except financebot Prod Monitor and ElderVoiceApp
    Site Monitor, 30 min). Fix a repo that breaks this in its own PR.
-5. **Our own CI first (Cody, 2026-10-06).** Private repos' PR and default-branch test jobs run
-   free on `neo-ci` and say exactly
-   `runs-on: ${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && vars.CI_RUNS_ON || 'ubicloud-standard-2' }}`
-   (a bigger approved label stays the fallback); never `runs-on: neo-ci`. Schedules, manual
-   runs, deploys and secret-holding jobs keep their runners (other private Linux jobs
-   `ubicloud-standard-2`, public repos free GitHub-hosted runners, macOS/Windows the runner
-   Cody approved). Moving a repo on is standing work: first install the dispatcher
-   support (it checks queued pushes and reusable workflows for secrets, environments and
-   write permissions), then the expression in eligible jobs (no secrets; `permissions:`
-   writes only on the writing job), merge, then
-   `sudo local-ci enroll <owner/repo>` on codypc (`fallback` reverts; a session without access
-   files it). On it when `gh variable list` shows `CI_RUNS_ON` = `neo-ci`. A queued `neo-ci`
+5. **Our own CI only (Cody, 2026-10-06; 2026-11-13: "use it exclusively").** Every
+   private-repo Linux job runs free on our server; never add or keep a `ubicloud-*` label.
+   PR and default-branch test jobs say exactly
+   `runs-on: ${{ (github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && vars.CI_RUNS_ON || 'neo-ci-trusted' }}`
+   (PR-only jobs: `${{ github.event_name == 'pull_request' && vars.CI_RUNS_ON || 'neo-ci-trusted' }}`;
+   a bigger approved label such as `neo-ci-heavy` may replace `vars.CI_RUNS_ON`); never
+   `runs-on: neo-ci`. Schedules, manual runs, deploys, writes and secret-holding jobs say
+   `runs-on: neo-ci-trusted` (same-repo default-branch runs only, `pull_request_target`
+   for PRs into the default branch; anything else is cancelled, so enroll a repo before
+   its PR jobs can run). A PR job needing a secret moves to `pull_request_target` only if
+   it never checks out or runs PR code (PR text reaches scripts only through `env`);
+   otherwise after merge or a test double. Public repos: free GitHub-hosted
+   runners; macOS/Windows the runner Cody approved. Moving a repo on is standing work:
+   first install the dispatcher support (it checks queued pushes and reusable workflows for
+   secrets, environments and write permissions), then `sudo local-ci enroll <owner/repo>`
+   on codypc (`fallback` reverts; a session without access files it), then the expression
+   in eligible jobs (no secrets; `permissions:` writes only on the writing job), confirm
+   the PR's checks ran here, merge. On it when `gh variable list` shows `CI_RUNS_ON` = `neo-ci`. A queued `neo-ci`
    job is pending, not failed. Default-branch runs may write shared caches; PR caches stay
    isolated (`int-hostinger-vps/docs/CI-FOR-AGENTS.md`).
 
